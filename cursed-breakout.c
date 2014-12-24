@@ -68,23 +68,25 @@ int main() {
             didUpdate = 1;
             switch (ch) {
                 case KEY_LEFT:
-                    if (paddlePosition > 2)
+                    if (paddlePosition > 1) {
                         paddlePosition--;
+                        mvwaddch(stdscr, height - 2, paddlePosition + paddleLength + 1 , ' ');
+                    }
                     break;
                 case KEY_RIGHT:
-                    if (paddlePosition < (width-paddleLength-3))
+                    if (paddlePosition < (width - paddleLength - 2)) {
                         paddlePosition++;
+                        mvwaddch(stdscr, height - 2, paddlePosition - 1 , ' ');
+                    }
                     break;
             }
         }
 
         /* Update the paddle accordingly if key is pressed */
         if (didUpdate == 1) {
-            mvwaddch(stdscr, height - 2, paddlePosition - 1 , ' ');
             for (i = 0; i <= paddleLength; i++) {
                 mvwaddch(stdscr, height - 2, paddlePosition + i, '#');
             }
-            mvwaddch(stdscr, height - 2, paddlePosition + paddleLength + 1 , ' ');
         }
         
         /* Ball */
@@ -101,6 +103,9 @@ int main() {
                 velocityX = velocityX * -1;
             }
             if ((mvwinch(stdscr, (int)ballY + 1, (int)ballX) == ACS_HLINE) || (mvwinch(stdscr, (int)ballY - 1, (int)ballX) == ACS_HLINE)) {
+                velocityY = velocityY * -1;
+            }
+            if (mvwinch(stdscr, (int)ballY + 1, (int)ballX) == '#') {
                 velocityY = velocityY * -1;
             }
             ballTick = 0;
