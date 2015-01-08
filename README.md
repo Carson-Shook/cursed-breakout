@@ -14,7 +14,7 @@ Press `q` to quit.
 - Cleaning up existing calculations to reduce the amount of time that the CPU spends in the collision
 - Figuring out a method to capture key presses to improve paddle movement.
 - ~~Properly making the ball's directional velocity change according to where the paddle is struck~~.
-**Change of plans on that one.** I`ll save it for later. getting the calculations right will takes lots of fine tuning.
+**Change of plans on that one.** I'll save it for later. Getting the calculations right will take lots of fine tuning.
 
 # Build Instructions
 Type `make` to build the program, and `./breakout` to run it.
