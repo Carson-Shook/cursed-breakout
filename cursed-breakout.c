@@ -27,10 +27,10 @@
 
 #include <locale.h>
 #include <stdio.h>
-#include <libc.h>
 #include <ncurses.h>
 #include <sys/ioctl.h>
 #include <string.h>
+#include <time.h>
 
 /* Saving this for later
  #include <signal.h>
@@ -287,16 +287,21 @@ int main(void) {
     int ballTick = 0, ballDelay = 10000;
     int velocityX = -1, velocityY = -1;
     int didUpdate = 1;
+    clock_t timer;
+    double seconds = CLOCKS_PER_SEC/10;
+    WINDOW *gamescr;
     
     struct winsize max;
     ioctl(0, TIOCGWINSZ , &max);
+    
 #ifdef DEBUG
     WINDOW *local_win;
 #endif
     
+    // Check terminal size before starting
     if ((max.ws_row < height) || (max.ws_col < width)) {
-        printf("The terminal is too small. :(\nPlease resize it to at least %d by %d\n\n", width, height);
-        exit(1);
+        printf("The terminal is too small. :(\nPlease resize it to at least %d by %d, and try again.\n\n", width, height);
+        return(1);
     }
     
     paddlePosition = (width/2) - (paddleLength/2);
@@ -312,8 +317,8 @@ int main(void) {
     }
     // Sets window properties
 	initscr();
-    stdscr = newwin(height, width, (LINES - height)/2, (COLS - width)/2);
-	wborder(stdscr, ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE, ACS_ULCORNER, ACS_URCORNER, ACS_LLCORNER, ACS_LRCORNER);
+    gamescr = newwin(height, width, (LINES - height)/2, (COLS - width)/2);
+	wborder(gamescr, ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE, ACS_ULCORNER, ACS_URCORNER, ACS_LLCORNER, ACS_LRCORNER);
     cbreak();
     noecho();
     keypad(stdscr, TRUE);
@@ -324,6 +329,7 @@ int main(void) {
 #ifdef DEBUG
     local_win = newwin(4, 20, 0, 0);
 #endif
+    timer = clock();
     /* Begin infinite loop */
 	while ((ch = getch()) != 113) {
 		
@@ -334,13 +340,13 @@ int main(void) {
                 case KEY_LEFT:
                     if (paddlePosition > 1) {
                         paddlePosition--;
-                        mvwaddch(stdscr, height - 2, paddlePosition + paddleLength + 1 , ' ');
+                        mvwaddch(gamescr, height - 2, paddlePosition + paddleLength + 1 , ' ');
                     }
                     break;
                 case KEY_RIGHT:
                     if (paddlePosition < (width - paddleLength - 2)) {
                         paddlePosition++;
-                        mvwaddch(stdscr, height - 2, paddlePosition - 1 , ' ');
+                        mvwaddch(gamescr, height - 2, paddlePosition - 1 , ' ');
                     }
                     break;
             }
@@ -349,25 +355,24 @@ int main(void) {
         /* Update the paddle accordingly if key is pressed */
         if (didUpdate == 1) {
             for (i = 0; i <= paddleLength; i++) {
-                mvwaddch(stdscr, height - 2, paddlePosition + i, '#');
+                mvwaddch(gamescr, height - 2, paddlePosition + i, '#');
             }
         }
         
-        /* Ball */
-        if (ballTick < ballDelay) {
-            ballTick++;
-        }
-        else {
+        /* Check to see if the apropriate amount of time has
+         * passed, and update the ball postion if so.
+         */
+        if (difftime(clock(),timer) >= seconds) {
             didUpdate = 1;
             
-            aroundBall[0] = mvwinch(stdscr, (int)ballY - 1, (int)ballX - 1);
-            aroundBall[1] = mvwinch(stdscr, (int)ballY - 1, (int)ballX);
-            aroundBall[2] = mvwinch(stdscr, (int)ballY - 1, (int)ballX + 1);
-            aroundBall[3] = mvwinch(stdscr, (int)ballY, (int)ballX - 1);
-            aroundBall[4] = mvwinch(stdscr, (int)ballY, (int)ballX + 1);
-            aroundBall[5] = mvwinch(stdscr, (int)ballY + 1, (int)ballX - 1);
-            aroundBall[6] = mvwinch(stdscr, (int)ballY + 1, (int)ballX);
-            aroundBall[7] = mvwinch(stdscr, (int)ballY + 1, (int)ballX + 1);
+            aroundBall[0] = mvwinch(gamescr, (int)ballY - 1, (int)ballX - 1);
+            aroundBall[1] = mvwinch(gamescr, (int)ballY - 1, (int)ballX);
+            aroundBall[2] = mvwinch(gamescr, (int)ballY - 1, (int)ballX + 1);
+            aroundBall[3] = mvwinch(gamescr, (int)ballY, (int)ballX - 1);
+            aroundBall[4] = mvwinch(gamescr, (int)ballY, (int)ballX + 1);
+            aroundBall[5] = mvwinch(gamescr, (int)ballY + 1, (int)ballX - 1);
+            aroundBall[6] = mvwinch(gamescr, (int)ballY + 1, (int)ballX);
+            aroundBall[7] = mvwinch(gamescr, (int)ballY + 1, (int)ballX + 1);
 #ifdef DEBUG
             mvwaddch(local_win, 0, 0, aroundBall[0]);
             mvwaddch(local_win, 0, 1, aroundBall[1]);
@@ -386,12 +391,13 @@ int main(void) {
                 
                 didUpdate = collider(aroundBall, ballX, ballY, &velocityX, &velocityY, bricks, brickLength, height, width);
             }
-            mvwaddch(stdscr, ballY, ballX , ' ');
+            mvwaddch(gamescr, ballY, ballX , ' ');
             ballX = ballX + velocityX;
             ballY = ballY + velocityY;
             
-            ballTick = 0;
+            timer = clock();
         }
+        
         
         /* Update the bricks accordingly if an update occurs */
         if (didUpdate == 1) {
@@ -399,30 +405,30 @@ int main(void) {
                 for (j = 0; j < brickColumns; j++) {
                     if (bricks[i][j] == 1) {
                         for (n = 1; n < brickLength - 1; n++) {
-                            mvwaddch(stdscr,(i*2)+1,(j*brickLength)+n+1,ACS_HLINE);
-                            mvwaddch(stdscr,(i*2)+2,(j*brickLength)+n+1,ACS_HLINE);
+                            mvwaddch(gamescr,(i*2)+1,(j*brickLength)+n+1,ACS_HLINE);
+                            mvwaddch(gamescr,(i*2)+2,(j*brickLength)+n+1,ACS_HLINE);
                         }
-                        mvwaddch(stdscr,(i*2)+1,(j*brickLength)+1,ACS_ULCORNER);
-                        mvwaddch(stdscr,(i*2)+2,(j*brickLength)+1,ACS_LLCORNER);
-                        mvwaddch(stdscr,(i*2)+1,(j*brickLength)+n+1,ACS_URCORNER);
-                        mvwaddch(stdscr,(i*2)+2,(j*brickLength)+n+1,ACS_LRCORNER);
+                        mvwaddch(gamescr,(i*2)+1,(j*brickLength)+1,ACS_ULCORNER);
+                        mvwaddch(gamescr,(i*2)+2,(j*brickLength)+1,ACS_LLCORNER);
+                        mvwaddch(gamescr,(i*2)+1,(j*brickLength)+n+1,ACS_URCORNER);
+                        mvwaddch(gamescr,(i*2)+2,(j*brickLength)+n+1,ACS_LRCORNER);
                     }
                     else {
                         for (n = 1; n < brickLength - 1; n++) {
-                            mvwaddch(stdscr,(i*2)+1,(j*brickLength)+n+1,' ');
-                            mvwaddch(stdscr,(i*2)+2,(j*brickLength)+n+1,' ');
+                            mvwaddch(gamescr,(i*2)+1,(j*brickLength)+n+1,' ');
+                            mvwaddch(gamescr,(i*2)+2,(j*brickLength)+n+1,' ');
                         }
-                        mvwaddch(stdscr,(i*2)+1,(j*brickLength)+1,' ');
-                        mvwaddch(stdscr,(i*2)+2,(j*brickLength)+1,' ');
-                        mvwaddch(stdscr,(i*2)+1,(j*brickLength)+n+1,' ');
-                        mvwaddch(stdscr,(i*2)+2,(j*brickLength)+n+1,' ');
+                        mvwaddch(gamescr,(i*2)+1,(j*brickLength)+1,' ');
+                        mvwaddch(gamescr,(i*2)+2,(j*brickLength)+1,' ');
+                        mvwaddch(gamescr,(i*2)+1,(j*brickLength)+n+1,' ');
+                        mvwaddch(gamescr,(i*2)+2,(j*brickLength)+n+1,' ');
                     }
                 }
             }
-            mvwaddch(stdscr, ballY, ballX , 'o');
+            mvwaddch(gamescr, ballY, ballX , 'o');
         }
         /* Update the screen, and reset the didUpdate variable */
-        wrefresh(stdscr);
+        wrefresh(gamescr);
 #ifdef DEBUG
         wrefresh(local_win);
 #endif
