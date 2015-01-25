@@ -23,28 +23,28 @@ Type `make` to build the program, and `./breakout` to run it.
 For debugging (*note: slows the ball down due to extra refresh each cycle*), type `make debug` when compiling. You may need to type `make clean` before doing so if you have already built it normally. Make sure that you choose an ample size for your terminal emulator if you use the debug info. It may overlap the game if you do not. 
 
 # Changelog
-- v0.4.1 alpha
--- Made ball speed processor independent by replacing the counter with `difftime()` check that gets the difference of two `clock()` functions. *Note: this is still compiler dependent, so I'll need to perform more tests to verify my own claims.*
--- Replaced instances of `stdscr` with `gamescr` to fix display issues on some Linux systems
+v0.4.1 alpha
+- Made ball speed processor independent by replacing the counter with `difftime()` check that gets the difference of two `clock()` functions. *Note: this is still compiler dependent, so I'll need to perform more tests to verify my own claims.*
+- Replaced instances of `stdscr` with `gamescr` to fix display issues on some Linux systems
 
-- v0.4 alpha
--- Removed old "collision system"
--- Added new ball collision system that can check all characters adjacent to itself, and allows bricks to break
--- Added a startup check to ensure that the terminal window is large enough
--- General code cleanup, equations in particular
--- Added debug option when building, `make debug`
--- Updated MIT License year to 2015 and copied it into the main program
+v0.4 alpha
+- Removed old "collision system"
+- Added new ball collision system that can check all characters adjacent to itself, and allows bricks to break
+- Added a startup check to ensure that the terminal window is large enough
+- General code cleanup, equations in particular
+- Added debug option when building, `make debug`
+- Updated MIT License year to 2015 and copied it into the main program
 
-- v0.3 alpha
--- Fixed paddle edge cases
--- Add collision check for ball and paddle
+v0.3 alpha
+- Fixed paddle edge cases
+- Add collision check for ball and paddle
 
-- v0.2 alpha
--- Added ball momentum
--- Added ball/wall collision
--- Made bricks variable length to allow for screen resizing
+v0.2 alpha
+- Added ball momentum
+- Added ball/wall collision
+- Made bricks variable length to allow for screen resizing
 
-- v0.1 alpha
--- Added loop to initialize and draw bricks on screen
--- Added paddle drawing and movement
--- Added the MIT License
+v0.1 alpha
+- Added loop to initialize and draw bricks on screen
+- Added paddle drawing and movement
+- Added the MIT License
