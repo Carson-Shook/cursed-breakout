@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -o breakout
-LDFLAGS = -lncurses
+LDFLAGS = -lncurses -lm
 
 OBJS = cursed-breakout.o
 a.out: $(OBJS)

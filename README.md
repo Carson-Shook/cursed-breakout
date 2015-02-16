@@ -1,28 +1,35 @@
-# cursed-breakout v0.4.1 alpha
-The beloved brick breaking game now running in your favorite terminal emulator! While browsing GitHub, I was unable to find any Breakout clones that were made in pure C, so I decided to rectify this. Cursed-breakout is built using the ncurses library, hence the name, and should run on most Posix systems, though it is under active development, and this is not currently guaranteed. Once in a more polished state, I'll start making the appropriate checks to ensure smooth sailing on other systems. Support for Windows will (maybe) come after the program is more or less complete.
+# cursed-breakout v0.5 alpha
+The beloved brick breaking game now running in your favorite terminal emulator! While browsing GitHub, I was unable to find any Breakout clones that were made in pure C, so I decided to rectify this. Cursed-breakout is built using the ncurses library, hence the name, and should run on most Posix systems, though it is under active development and this is not currently guaranteed. Once in a more polished state, I'll start making the appropriate optimizations to ensure smooth sailing on other systems. Support for Windows will (maybe) come after the program is more or less complete.
 
 It`s just a fun little project, and anyone who wants may use it for commercial or non-commercial projects, as long as the usage adheres to the MIT license. Have fun!
 
 ### Current Features
-Move the paddle left and right with the left and right arrow keys to bounce the ball. Try to break all of the bricks in the level by bouncing the ball into them.
+Move the paddle left and right with the left and right arrow keys to bounce the ball. You can also use the up and down arrow keys to move a little faster. Try to break all of the bricks in the level by bouncing the ball into them. Don't loose all of your lives, and try to achieve a high score.
 
 Press `q` to quit.
 
 ### Features Under Development
-- Ball reset on bounce miss
-- Scoring system
 - Pause/Resume
-- Settings menu for changing ball speed/game window size, or whatever else I feel needs an option
-- Cleaning up existing calculations to reduce the amount of time that the CPU spends in the collision section
-- A method to capture key presses (`key_up` `key_down` sorts of things) to improve paddle movement
-- Changing directional velocity according to where the ball strikes the paddle
-*Saving this one for later. Getting the calculations right will take lots of fine tuning.*
+- Custom level system
+- Cleaning up existing calculations to improve readability
+- Changing directional velocity according to where the ball strikes the paddle. *This one is proving difficult to implement, but I have an idea that I'm pondering on.*
+- ~~A method to capture key presses (`key_up` and `key_down` sorts of things) to improve paddle movement~~ *I've found that this is almost impossible at the moment, but if anyone knows a way to get the events and write appropriate handlers for them, let me know.*
 
 # Build Instructions
 Type `make` to build the program, and `./breakout` to run it.
-For debugging (*note: slows the ball down due to extra refresh each cycle*), type `make debug` when compiling. You may need to type `make clean` before doing so if you have already built it normally. Make sure that you choose an ample size for your terminal emulator if you use the debug info. It may overlap the game if you do not. 
+For debugging, type `make debug` when compiling. You may need to type `make clean` before doing so if you have already built it normally. Make sure that you choose an ample size for your terminal emulator if you use the debug info. It may overlap the game if you do not. 
 
 # Changelog
+v0.5 alpha
+- Added ball reset, life count, and **Game Over** screen
+- Added score system with multiplier for each successful hit
+- Added up and down arrow key condition checks to allow for moving the paddle twice as fast
+- Moved collision system into `main`
+- Fixed a bug with the lower right corner of the ball (the case was being skipped on accident)
+- Fixed a slight error in my math that sometimes caused problems for bricks that were on the right side of the game screen
+- Fixed slowdown caused by debug mode
+- Updated Makefile to include the C math library to perform a logarithmic function in the program.
+
 v0.4.1 alpha
 - Made ball speed processor independent by replacing the counter with `difftime()` check that gets the difference of two `clock()` functions. *Note: this is still compiler dependent, so I'll need to perform more tests to verify my own claims.*
 - Replaced instances of `stdscr` with `gamescr` to fix display issues on some Linux systems
