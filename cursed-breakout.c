@@ -1,5 +1,5 @@
 
-/******************************** cursed-breakout *********************************
+ /******************************** cursed-breakout *********************************
  *                                                                                 *
  * The MIT License (MIT)                                                           *
  *                                                                                 *
@@ -27,164 +27,275 @@
 
 #include <locale.h>
 #include <stdio.h>
-#include <ncurses.h>
+#include <stdlib.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+//#include <dirent.h> I should be using this later
 #include <string.h>
 #include <time.h>
+#include <ncurses.h>
 #include <math.h>
 
-/* Saving this for later
- #include <signal.h>
- void* resizeHandler(int);
- 
- int main(void) {
- signal(SIGWINCH, resizeHandler);
- }
- 
- void* resizeHandler(int sig)
- {
- int nh, nw;
- getmaxyx(stdscr, nh, nw);
- }
- */
-
-int increaseMult(int);
-
-int main(void) {
+int increaseMult(int, int);
+    
+int main(int argc, char *argv[]) {
     
     setlocale(LC_ALL, "");
+    struct winsize max;                         // max size of the terminal
+    ioctl(0, TIOCGWINSZ , &max);                // gets the max size of the terminal
+    
+    int i, j, n, x = 0;                         // temporary for-loop variables
+    int ch;                                     // stores keypresses
    
-    int height = 24;                        // game screen height
-    int width = 82;                         // game screen width
-    int scoreWinHeight = 2;                 // height of the score window
-    int brickRows = 3;                      // rows of bricks to generate
-    int brickColumns = 20;                  // collumns of bricks to generate
-    int bricks[brickRows][brickColumns];    // array to hold the locations of each brick
-    int brickLength;                        // how long the bricks should be
+    int height = 24;                            // game screen height
+    int width = 82;                             // game screen width
+    int scoreWinHeight = 2;                     // height of the score window
+    int brickRows = 6;                          // rows of bricks to generate
+    int brickColumns = 20;                      // columns of bricks to generate
+    int bricks[brickRows][brickColumns];        // array to hold the locations of each brick
+    int brickLength;                            // how long the bricks should be
     
-    int i, j, n;                            // Temporary for-loop variables
-    int ch;                                 // Stores keypresses
+    int paddlePosition;                         // location of the paddle's leftmost point
+    int paddleLength = 16;                      // length of the paddle
     
-    int paddlePosition;                     // Location of the paddle's leftmost point
-    int paddleLength = 16;                  // Length of the paddle
+    int ballX, ballY;                           // ball X and Y coordinates
+    int velocityX = -1, velocityY = -1;         // ball X and Y directional veloctiy (not true velocity, that's handled through xDelay and yDelay)
+    int aroundBall[8];                          // holds characters currently around the ball
+    int collisionCase;                          // contains the current collision case for determining ball action
+    int xDidBounceAlready = 1;                  // flag to indicate if the ball has already had its x velocity flipped
+    int yDidBounceAlready = 1;                  // flag to indicate if the ball has already had its y velocity flipped
     
-    int ballX, ballY;                       // ball X and Y coordinates
-    int velocityX = -1, velocityY = -1;     // ball X and Y velocity
-    int aroundBall[8];                      // array to hold the
-    int collisionCase;                      // contains the current collision case for determining ball action
-  /*float velDiff                           difference in velocity, intended for changing the ball speed
-                                             but there are some... issues with that since ncurses is based
-                                             on an integer array. See below for details*/
+    int velDiff;                                                // change in velocity, see "VELOCITY ADJUSTER" below
+    unsigned int universalDelay = CLOCKS_PER_SEC/20;            // the base rate of delay between ball updates
+    unsigned int delayAdjuster = CLOCKS_PER_SEC/2000;           // base multiplier to adjust delay time by
+    unsigned int xDelay = universalDelay + delayAdjuster * 140; // seconds until the ball's x coordinate updates
+    unsigned int yDelay = universalDelay + delayAdjuster * 10;  // seconds until the ball's y coordinate updates
+    clock_t xTimer;                                             // structure that holds the time since the last ball x coordinate update
+    clock_t yTimer;                                             // structure that holds the time since the last ball y coordinate update
+
+    int xUpdate = 0;                            // flag to indicate that the ball's x coordinate should change
+    int yUpdate = 0;                            // flag to indicate that the ball's y coordinate should change
+    int ballUpdate = 1;                         // flag to trip if ball updates
+    int paddleUpdate = 1;                       // flag to trip if paddle updates
+    int collisionUpdate = 1;                    // flag to trip if bricks update
+    int didReset = 1;                           // flag to trigger death sequence actions
+    int levelComplete = 1;                      // flag to trigger next level sequence
+    int victory = 0;
+    int quitFlag = 0;                           // flag to trigger quit sequence
     
-    int didUpdate = 1;                      // flag to trip if anything changes onscreen
-    int didDie = 1;                         // flag to trigger death sequence actions
-    double seconds = CLOCKS_PER_SEC/12;     // seconds until the ball moves. May add separate X and Y in the future
-    clock_t timer;                          // structure that holds the time since the last ball update
+    unsigned int playerScore = 0;               // the player's score
+    int scoreMultiplier = 1;                    // the current score multiplier
+    int ballsRemaining = 3;                     // number of lives the player has
     
-    unsigned int playerScore = 0;           // the player's score
-    int scoreMultiplier = 1;                // the current score multiplier
-    int ballsRemaining = 3;                 // number of lives the player has
-    
-    WINDOW *gamescr;                        // the game screen window
-    WINDOW *score_win;                      // the score and life-count window
-    WINDOW *gameOverWin;
+    WINDOW *gamescr;                            // the game screen window
+    WINDOW *scoreWin;                           // the score and life-count window
+    WINDOW *gameOverWin;                        // the game over window
 #ifdef DEBUG
-    WINDOW *debug_win;                      // debug window (I should hope that to be obvious enough)
+    WINDOW *debug_win;                          // debug window (I should hope that to be obvious enough)
 #endif
-    
-    struct winsize max;                     // max size of the terminal
-    ioctl(0, TIOCGWINSZ , &max);            // gets the max size of the terminal
     
 #ifndef DEBUG
     // Check terminal size before starting
     if ((max.ws_row < (height + scoreWinHeight)) || (max.ws_col < width)) {
         printf("The terminal is too small. :(\nPlease resize it to at least %d by %d, and try again.\n\n", width, (height + scoreWinHeight));
-        return(1);
+        return 1;
     }
 #endif
     
-    // set initial paddle position and ball location
-    paddlePosition = (width/2) - (paddleLength/2);
-    ballX = (width/2);
-    ballY = height - 3;
+    FILE *levels;                               // file pointer for accessing any level files
+    char *buffer;                               // dynamically allocated buffer that holds all level data
+    char title[50];                             // level title
     
-    // Set all brick length, and set all
-    // bricks as active by iteratively
-    // initializing all values to 1
-    brickLength = (width - 2)/brickColumns;
-    for (i = 0; i < brickRows; i++) {
-        for (j = 0; j < brickColumns; j++) {
-            bricks[i][j] = 1;
+    /* BEGIN FILE READ SECTION */
+    
+    // This is where the provided file is copied into the buffer, and
+    // the first level is copied into the brick array. Otherwise, a
+    if (argc == 2) {
+        levels = fopen(argv[1], "r");
+        if (levels) {
+            if (fseeko(levels, 0 , SEEK_END) != 0) {
+                printf("Error: The file is empty\n");
+                return 2;
+            }
+            int file_size = ftello(levels);
+            buffer = (char*)malloc(file_size);
+            rewind(levels);
+            fread(buffer, sizeof(char), file_size, levels);
+            fclose(levels);
+        }
+        else {
+            fclose(levels);
+            return 1;
+        }
+        
+        // Set first level
+        if ((ch = buffer[x]) != '%') {
+            i = 0;
+            if (buffer[x] == '*') {
+                while (buffer[x++] != '\n') {
+                }
+            }
+            while ((ch = buffer[x++]) != '\n') {
+                title[i++] = ch;
+            }
+            for (i = 0; i < brickRows; i++) {
+                for (j = 0; j < brickColumns; j++) {
+                    bricks[i][j] = buffer[x++] - '0';
+                }
+                x++;
+            }
+            didReset = 1;
+        }
+        else {
+            victory = 1;
+            levelComplete = 0;
         }
     }
+    // Set first level for infinite mode
+    else {
+        for (i = 0; i < brickRows; i++) {
+            for (j = 0; j < brickColumns; j++) {
+                bricks[i][j] = 1;
+            }
+        }
+        strcpy(title, "Infinite Mode");
+    }
+    
+    /* END FILE READ SECTION */
+    
+    /* BEGIN INITIALIZATION SECTION */
+    
+    // set initial paddle position and ball location
+    paddlePosition = (width / 2) - (paddleLength / 2);
+    ballX = width / 2;
+    ballY = height - 3;
+    
+    // Set brick length, and set all
+    // bricks as active by iteratively
+    // initializing all values to 1
+    brickLength = (width - 2) / brickColumns;
     
     // enters curses mode and sets window properties
     initscr();
     gamescr = newwin(height, width, ((LINES - height) / 2) - (scoreWinHeight / 2), (COLS - width) / 2);
-    score_win = newwin(scoreWinHeight, width, ((LINES - height) / 2) + height - (scoreWinHeight / 2), (COLS - width) / 2);
+    scoreWin = newwin(scoreWinHeight, width, ((LINES - height) / 2) + height - (scoreWinHeight / 2), (COLS - width) / 2);
 #ifdef DEBUG
-    debug_win = newwin(4, 50, 0, 0);
+    debug_win = newwin(4, width, 0, 0);
 #endif
     wborder(gamescr, ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE, ACS_ULCORNER, ACS_URCORNER, ACS_LLCORNER, ACS_LRCORNER);
     cbreak();
     noecho();
+    leaveok(stdscr, TRUE);
     keypad(stdscr, TRUE);
     nodelay(stdscr, TRUE);
     curs_set(0);
-    timer = clock();
+    xTimer = clock();
+    yTimer = clock();
     
-    // Begin infinite loop, press q to quit
-    while ((ch = getch()) != 'q') {
+    /* END INITIALIZATION SECTION */
+    
+    while (!quitFlag) {
         
-        // Detect left or right arrow key press, as well as up or down
+        /* BEGIN INPUT AND MOVEMENT SECTION */
+        
+        ch = getch();
+        
+        // Detect key presses
         if (ch != ERR) {
             switch (ch) {
-                case KEY_LEFT:
+                // move left
+                case KEY_DOWN:
                     if (paddlePosition > 1) {
                         paddlePosition--;
                         mvwaddch(gamescr, height - 2, paddlePosition + paddleLength + 1 , ' ');
                     }
+                    paddleUpdate = 1;
                     break;
-                case KEY_RIGHT:
+                // move right
+                case KEY_UP:
                     if (paddlePosition < (width - paddleLength - 2)) {
                         paddlePosition++;
                         mvwaddch(gamescr, height - 2, paddlePosition - 1 , ' ');
                     }
+                    paddleUpdate = 1;
                     break;
-                case KEY_DOWN:
+                // move left faster
+                case KEY_LEFT:
                     if (paddlePosition > 2) {
-                        paddlePosition = paddlePosition - 2;
+                        paddlePosition -= 2;
                         mvwprintw(gamescr, height - 2, paddlePosition + paddleLength + 1 , "  ");
                     }
+                    else if (paddlePosition > 1) {
+                        paddlePosition--;
+                        mvwaddch(gamescr, height - 2, paddlePosition + paddleLength + 1 , ' ');
+                    }
+                    paddleUpdate = 1;
                     break;
-                case KEY_UP:
+                // move right faster
+                case KEY_RIGHT:
                     if (paddlePosition < (width - paddleLength - 3)) {
-                        paddlePosition = paddlePosition + 2;
+                        paddlePosition += 2;
                         mvwprintw(gamescr, height - 2, paddlePosition - 2 , "  ");
                     }
+                    else if (paddlePosition < (width - paddleLength - 2)) {
+                        paddlePosition++;
+                        mvwaddch(gamescr, height - 2, paddlePosition - 1 , ' ');
+                    }
+                    paddleUpdate = 1;
+                    break;
+                // pause
+                case 'p':
+                    nodelay(stdscr, FALSE);
+                    mvwprintw(gamescr, height/2 + 2, width/2 - 4, "(P)aused");
+                    mvwprintw(gamescr, height/2 + 3, width/2 - 4, "(Q)uit");
+                    wrefresh(gamescr);
+                    while (!quitFlag && (ch = getch()) != 'p'){
+                        usleep(10);
+                        if (ch == 'q') {
+                            quitFlag = 1;
+                        }
+                    }
+                    mvwprintw(gamescr, height/2 + 2, width/2 - 4, "        ");
+                    mvwprintw(gamescr, height/2 + 3, width/2 - 4, "      ");
+                    collisionUpdate = 1;
+                    nodelay(stdscr, TRUE);
                     break;
             }
-            didUpdate = 1;
         }
         
-         // Check to see if the apropriate amount of time has
-         // passed, and update the ball postion if so.
-        if (difftime(clock(),timer) >= seconds) {
-            timer = clock();
-            
+        // Check to see if the apropriate amount of time has
+        // passed, and update the ball postion if so.
+        if (difftime(clock(),xTimer) >= xDelay) {
+            xTimer = clock();
+            xUpdate = 1;
+        }
+        if (difftime(clock(),yTimer) >= yDelay) {
+            yTimer = clock();
+            yUpdate = 1;
+        }
+        
+        if (xUpdate || yUpdate) {
             mvwaddch(gamescr, ballY, ballX , ' ');
-            ballX = ballX + velocityX;
-            ballY = ballY + velocityY;
+            if (xUpdate) {
+                ballX += velocityX;
+                xDidBounceAlready = 0;
+            }
+            if (yUpdate) {
+                ballY += velocityY;
+                yDidBounceAlready = 0;
+            }
+            xUpdate = 0;
+            yUpdate = 0;
             
-            aroundBall[0] = mvwinch(gamescr, (int)ballY - 1, (int)ballX - 1);
-            aroundBall[1] = mvwinch(gamescr, (int)ballY - 1, (int)ballX);
-            aroundBall[2] = mvwinch(gamescr, (int)ballY - 1, (int)ballX + 1);
-            aroundBall[3] = mvwinch(gamescr, (int)ballY, (int)ballX - 1);
-            aroundBall[4] = mvwinch(gamescr, (int)ballY, (int)ballX + 1);
-            aroundBall[5] = mvwinch(gamescr, (int)ballY + 1, (int)ballX - 1);
-            aroundBall[6] = mvwinch(gamescr, (int)ballY + 1, (int)ballX);
-            aroundBall[7] = mvwinch(gamescr, (int)ballY + 1, (int)ballX + 1);
+            aroundBall[0] = mvwinch(gamescr, (int)ballY - 1, (int)ballX - 1);   // top left
+            aroundBall[1] = mvwinch(gamescr, (int)ballY - 1, (int)ballX);       // top
+            aroundBall[2] = mvwinch(gamescr, (int)ballY - 1, (int)ballX + 1);   // top right
+            aroundBall[3] = mvwinch(gamescr, (int)ballY, (int)ballX - 1);       // left
+            aroundBall[4] = mvwinch(gamescr, (int)ballY, (int)ballX + 1);       // right
+            aroundBall[5] = mvwinch(gamescr, (int)ballY + 1, (int)ballX - 1);   // bottom left
+            aroundBall[6] = mvwinch(gamescr, (int)ballY + 1, (int)ballX);       // bottom
+            aroundBall[7] = mvwinch(gamescr, (int)ballY + 1, (int)ballX + 1);   // bottom right
+
 #ifdef DEBUG
             mvwaddch(debug_win, 0, 0, aroundBall[0]);
             mvwaddch(debug_win, 0, 1, aroundBall[1]);
@@ -195,33 +306,16 @@ int main(void) {
             mvwaddch(debug_win, 2, 1, aroundBall[6]);
             mvwaddch(debug_win, 2, 2, aroundBall[7]);
             mvwprintw(debug_win, 0, 4, "%d %d ", ballY, ballX);
+            mvwprintw(debug_win, 1, 4, "yDelay %d     ", yDelay);
+            mvwprintw(debug_win, 2, 4, "xDelay %d     ", xDelay);
 #endif
             // only bothers with this code if the ball is near something
             if ((aroundBall[0] != ' ')||(aroundBall[1] != ' ')||(aroundBall[2] != ' ')||(aroundBall[3] != ' ')||(aroundBall[4] != ' ')||(aroundBall[5] != ' ')||(aroundBall[6] != ' ')||(aroundBall[7] != ' ')) {
                 
-                if (aroundBall[6] == '#') {
-                    
-                    velocityY = velocityY * -1;
-                    
-                    /*
-                     // Calcuates a velocity change based on the way that the
-                     // ball hits the paddle. Works in theory, not in practice
-                     // since moving too fast causes the ball to miss important
-                     // collision checks. Will revisit in the future.
-                     
-                     velDiff = ((paddlePosition + (paddleLength / 2)) - ballX) * 0.10;
-                     #ifdef DEBUG
-                     mvwprintw(debug_win, 0, 20, "%.2f ", velDiff);
-                     #endif
-                     velocityX = velocityX - velDiff;
-                     velocityY = velocityY + velDiff;
-                     */
-                }
-                
-                /* collider
-                 * acts a bit like a finite-state machine to
-                 * manage the collision system. It examines the individual
-                 * characters immediately around
+                /*                      THE COLLIDER
+                 *          - abandon hope all ye who enter here -
+                 * acts a bit like a finite-state machine to manage the collision
+                 * system. It examines the individual characters immediately around
                  * the ball and determines how to react based upon the type
                  * of characters next to it. If the character is part of a
                  * brick, then the location in the array is calculated by
@@ -229,8 +323,8 @@ int main(void) {
                  * update section of the main program, and setting that array
                  * value to zero. It also flips the appropriate velocity.
                  *
-                 * To be honest, there's probably at least one or two bugs
-                 * still hiding in here, so I'll continue to review it.
+                 * There are likely a good number of bugs still hiding in here.
+                 * TODO: fix wierd collision case that I can't quite pin down ATM.
                  */
                 
                 collisionCase = 0;
@@ -240,234 +334,316 @@ int main(void) {
                             
                         case 0:
                             // top
-                            if (aroundBall[1] != ' ') {
+                            if ((aroundBall[1] != ' ') && (velocityY < 0) && !yDidBounceAlready) {
                                 if (aroundBall[1] == ACS_LLCORNER) {
-                                    bricks[(((ballY-1)-2)/2)][(ballX-1)/brickLength] = 0;
-                                    velocityY = velocityY * -1;
-                                    playerScore = playerScore + scoreMultiplier;
-                                    scoreMultiplier = increaseMult(scoreMultiplier);
+                                    bricks[(((ballY - 1) - 2) / 2)][(ballX - 1) / brickLength] = 0;
+                                    velocityY *= -1;
+                                    playerScore += scoreMultiplier;
+                                    scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 8;
                                 }
                                 else if (aroundBall[1] == ACS_LRCORNER) {
-                                    bricks[(((ballY-1)-2)/2)][((ballX-1)-(brickLength-1))/brickLength] = 0;
-                                    velocityY = velocityY * -1;
-                                    playerScore = playerScore + scoreMultiplier;
-                                    scoreMultiplier = increaseMult(scoreMultiplier);
+                                    bricks[(((ballY - 1) - 2) / 2)][((ballX - 1) - (brickLength - 1)) / brickLength] = 0;
+                                    velocityY *= -1;
+                                    playerScore += scoreMultiplier;
+                                    scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 8;
                                 }
                                 else if (aroundBall[1] == ACS_HLINE) {
                                     if (ballY == 1) {
-                                        velocityY = velocityY * -1;
+                                        velocityY *= -1;
                                         collisionCase = 8;
                                     }
                                     else {
-                                        bricks[(((ballY-1)-2)/2)][(ballX-(ballX%(brickLength-1)))/brickLength] = 0;
-                                        velocityY = velocityY * -1;
-                                        playerScore = playerScore + scoreMultiplier;
-                                        scoreMultiplier = increaseMult(scoreMultiplier);
+                                        bricks[(((ballY - 1) - 2) / 2)][(ballX - (ballX % (brickLength))) / brickLength] = 0;
+                                        velocityY *= -1;
+                                        playerScore += scoreMultiplier;
+                                        scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                         collisionCase = 999;
                                     }
                                 }
-                                else collisionCase = 1;
+                                else collisionCase = 999;
+                                yDidBounceAlready = 1;
                             }
                             else collisionCase = 1;
                             break;
                         case 1:
                             // bottom
-                            if (aroundBall[6] != ' ') {
-                                if (aroundBall[6] == ACS_ULCORNER) {
-                                    bricks[(((ballY+1)-1)/2)][(ballX-1)/brickLength] = 0;
-                                    velocityY = velocityY * -1;
-                                    playerScore = playerScore + scoreMultiplier;
-                                    scoreMultiplier = increaseMult(scoreMultiplier);
+                            if ((aroundBall[6] != ' ') && (velocityY > 0) && !yDidBounceAlready) {
+                                // paddle collsion state
+                                if (aroundBall[6] == ACS_CKBOARD) {
+                                    velocityY *= -1;
+                                    
+                                    /*                 VELOCITY ADJUSTER
+                                     * calcuates a velocity change based on the way that the
+                                     * ball hits the paddle.
+                                     * velDiff is either positive or negative depending upon
+                                     * which side of the paddle it strikes. The degree to
+                                     * which this affects the current directional velocity                       |
+                                     * can be altered by changing the number at the very end                    \|/
+                                     * of this line.
+                                     */
+                                    
+                                    velDiff = ((paddlePosition + (paddleLength / 2)) - ballX) * delayAdjuster * 10;
+                                    if (velocityX > 0) {
+                                        xDelay += velDiff;
+                                        yDelay -= velDiff;
+                                    }
+                                    else if (velocityX < 0) {
+                                        xDelay -= velDiff;
+                                        yDelay += velDiff;
+                                    }
+                                    
+                                    // a bunch of magic numbers that determine the maximum and
+                                    // minimum velocity of the the ball. Tuned to perfection (I hope)
+                                    
+                                    // maximum x
+                                    if (xDelay > universalDelay + delayAdjuster * 140) {
+                                        xDelay = universalDelay + delayAdjuster * 140;
+                                    }
+                                    // minimum x
+                                    else if (xDelay < universalDelay - delayAdjuster * 10) {
+                                        xDelay = universalDelay - delayAdjuster * 10;
+                                    }
+                                    // maximum y
+                                    if (yDelay > universalDelay + delayAdjuster * 170) {
+                                        yDelay = universalDelay + delayAdjuster * 170;
+                                    }
+                                    // minimum y
+                                    else if (yDelay < universalDelay + delayAdjuster * 20) {
+                                        yDelay = universalDelay + delayAdjuster * 20;
+                                    }
+                                    collisionCase = 999;
+                                }
+                                else if (aroundBall[6] == ACS_ULCORNER) {
+                                    bricks[(((ballY + 1) - 1) / 2)][(ballX - 1) / brickLength] = 0;
+                                    velocityY *= -1;
+                                    playerScore += scoreMultiplier;
+                                    scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 8;
                                 }
                                 else if (aroundBall[6] == ACS_URCORNER) {
-                                    bricks[(((ballY+1)-1)/2)][((ballX-1)-(brickLength-1))/brickLength] = 0;
-                                    velocityY = velocityY * -1;
-                                    playerScore = playerScore + scoreMultiplier;
-                                    scoreMultiplier = increaseMult(scoreMultiplier);
+                                    bricks[(((ballY + 1) - 1) / 2)][((ballX - 1) - (brickLength - 1)) / brickLength] = 0;
+                                    velocityY *= -1;
+                                    playerScore += scoreMultiplier;
+                                    scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 8;
                                 }
                                 else if (aroundBall[6] == ACS_HLINE) {
                                     // this is the death state
-                                    if ((ballY) + 2 == height) {
+                                    if (ballY + 2 == height) {
                                         ballsRemaining--;
-                                        velocityY = velocityY * -1;
-                                        paddlePosition = (width/2) - (paddleLength/2);
+                                        velocityY *= -1;
                                         ballX = width / 2;
                                         ballY = height - 3;
+                                        for (i = 0; i <= paddleLength; i++) {
+                                            mvwaddch(gamescr, height - 2, paddlePosition + i, ' ');
+                                        }
+                                        paddlePosition = (width/2) - (paddleLength/2);
                                         scoreMultiplier = 1;
-                                        didDie = 1;
-                                        wclear(gamescr);
-                                        wborder(gamescr, ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE, ACS_ULCORNER, ACS_URCORNER, ACS_LLCORNER, ACS_LRCORNER);
+                                        paddleUpdate = 1;
+                                        ballUpdate = 1;
+                                        didReset = 1;
                                         collisionCase = 999;
                                     }
                                     else {
-                                        bricks[(((ballY+1)-1)/2)][(ballX-(ballX%(brickLength-1)))/brickLength] = 0;
-                                        velocityY = velocityY * -1;
-                                        playerScore = playerScore + scoreMultiplier;
-                                        scoreMultiplier = increaseMult(scoreMultiplier);
+                                        bricks[(((ballY + 1) - 1) / 2)][(ballX - (ballX % (brickLength))) / brickLength] = 0;
+                                        velocityY *= -1;
+                                        playerScore += scoreMultiplier;
+                                        scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                         collisionCase = 999;
                                     }
                                 }
-                                else collisionCase = 2;
+                                else collisionCase = 999;
+                                yDidBounceAlready = 1;
                             }
                             else collisionCase = 2;
                             break;
                         case 2:
                             // left
-                            if (aroundBall[3] != ' ') {
+                            if ((aroundBall[3] != ' ') && (velocityX < 0) && !xDidBounceAlready) {
                                 if (aroundBall[3] == ACS_URCORNER) {
-                                    bricks[(ballY-1)/2][((ballX-1)-(brickLength-1))/brickLength] = 0;
-                                    velocityX = velocityX * -1;
-                                    playerScore = playerScore + scoreMultiplier;
-                                    scoreMultiplier = increaseMult(scoreMultiplier);
+                                    bricks[(ballY - 1) / 2][((ballX - 1) - (brickLength - 1)) / brickLength] = 0;
+                                    velocityX *= -1;
+                                    playerScore += scoreMultiplier;
+                                    scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 999;
                                 }
                                 else if (aroundBall[3] == ACS_LRCORNER) {
-                                    bricks[(ballY-2)/2][((ballX-1)-(brickLength-1))/brickLength] = 0;
-                                    velocityX = velocityX * -1;
-                                    playerScore = playerScore + scoreMultiplier;
-                                    scoreMultiplier = increaseMult(scoreMultiplier);
+                                    bricks[(ballY - 2) / 2][((ballX - 1) - (brickLength - 1)) / brickLength] = 0;
+                                    velocityX *= -1;
+                                    playerScore += scoreMultiplier;
+                                    scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 999;
                                 }
                                 else if (aroundBall[3] == ACS_VLINE) {
                                     if (ballX == 1) {
-                                        velocityX = velocityX * -1;
+                                        velocityX *= -1;
                                         collisionCase = 999;
                                     }
                                 }
-                                else collisionCase = 3;
+                                else collisionCase = 999;
+                                xDidBounceAlready = 1;
                             }
                             else collisionCase = 3;
                             break;
                         case 3:
                             // right
-                            if (aroundBall[4] != ' ') {
+                            if ((aroundBall[4] != ' ') && (velocityX > 0) && !xDidBounceAlready) {
                                 if (aroundBall[4] == ACS_ULCORNER) {
-                                    bricks[(ballY-1)/2][((ballX+1)-1)/brickLength] = 0;
-                                    velocityX = velocityX * -1;
-                                    playerScore = playerScore + scoreMultiplier;
-                                    scoreMultiplier = increaseMult(scoreMultiplier);
+                                    bricks[(ballY - 1) / 2][((ballX + 1) - 1) / brickLength] = 0;
+                                    velocityX *= -1;
+                                    playerScore += scoreMultiplier;
+                                    scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 999;
                                 }
                                 else if (aroundBall[4] == ACS_LLCORNER) {
-                                    bricks[(ballY-2)/2][((ballX+1)-1)/brickLength] = 0;
-                                    velocityX = velocityX * -1;
-                                    playerScore = playerScore + scoreMultiplier;
-                                    scoreMultiplier = increaseMult(scoreMultiplier);
+                                    bricks[(ballY - 2) / 2][((ballX + 1) - 1) / brickLength] = 0;
+                                    velocityX *= -1;
+                                    playerScore += scoreMultiplier;
+                                    scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 999;
                                 }
                                 else if (aroundBall[4] == ACS_VLINE) {
                                     if (ballX + 2 == width) {
-                                        velocityX = velocityX * -1;
+                                        velocityX *= -1;
                                         collisionCase = 999;
                                     }
                                 }
-                                else collisionCase = 4;
+                                else collisionCase = 999;
+                                xDidBounceAlready = 1;
                             }
                             else collisionCase = 4;
                             break;
                         case 4:
                             // top left
-                            if ((aroundBall[0] == ACS_LRCORNER) && (velocityX < 0) && (velocityY < 0)) {
-                                bricks[((ballY-1)-2)/2][((ballX-1)-(brickLength-1))/brickLength] = 0;
-                                velocityX = velocityX * -1;
-                                velocityY = velocityY * -1;
-                                playerScore = playerScore + scoreMultiplier;
-                                scoreMultiplier = increaseMult(scoreMultiplier);
+                            if ((aroundBall[0] == ACS_LRCORNER) && (velocityX < 0) && (velocityY < 0) && !(xDidBounceAlready || yDidBounceAlready)) {
+                                bricks[((ballY - 1) - 2) / 2][((ballX - 1) - (brickLength - 1)) / brickLength] = 0;
+                                velocityX *= -1;
+                                velocityY *= -1;
+                                playerScore += scoreMultiplier;
+                                scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                 collisionCase = 999;
+                                yDidBounceAlready = 1;
+                                xDidBounceAlready = 1;
                             }
                             else collisionCase = 5;
                             break;
                         case 5:
                             // top right
-                            if ((aroundBall[2] == ACS_LLCORNER) && (velocityX > 0) && (velocityY < 0)) {
-                                bricks[((ballY-1)-2)/2][((ballX+1)-1)/brickLength] = 0;
-                                velocityX = velocityX * -1;
-                                velocityY = velocityY * -1;
-                                playerScore = playerScore + scoreMultiplier;
-                                scoreMultiplier = increaseMult(scoreMultiplier);
+                            if ((aroundBall[2] == ACS_LLCORNER) && (velocityX > 0) && (velocityY < 0) && !(xDidBounceAlready || yDidBounceAlready)) {
+                                bricks[((ballY - 1) - 2) / 2][((ballX + 1) - 1) / brickLength] = 0;
+                                velocityX *= -1;
+                                velocityY *= -1;
+                                playerScore += scoreMultiplier;
+                                scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                 collisionCase = 999;
+                                yDidBounceAlready = 1;
+                                xDidBounceAlready = 1;
                             }
                             else collisionCase = 6;
                             break;
                         case 6:
                             // lower left
-                            if ((aroundBall[5] == ACS_URCORNER) && (velocityX < 0) && (velocityY > 0)) {
-                                bricks[((ballY+1)-1)/2][((ballX-1)-(brickLength-1))/brickLength] = 0;
-                                velocityX = velocityX * -1;
-                                velocityY = velocityY * -1;
-                                playerScore = playerScore + scoreMultiplier;
-                                scoreMultiplier = increaseMult(scoreMultiplier);
-                                collisionCase = 999;
+                            if ((aroundBall[5] != ' ') && (velocityX < 0) && (velocityY > 0) && !(xDidBounceAlready || yDidBounceAlready)) {
+                                if (aroundBall[5] == ACS_URCORNER) {
+                                    bricks[((ballY + 1) - 1) / 2][((ballX - 1) - (brickLength - 1)) / brickLength] = 0;
+                                    velocityX *= -1;
+                                    velocityY *= -1;
+                                    playerScore += scoreMultiplier;
+                                    scoreMultiplier = increaseMult(scoreMultiplier, 1);
+                                    collisionCase = 999;
+                                    yDidBounceAlready = 1;
+                                    xDidBounceAlready = 1;
+                                }
+                                else if (aroundBall[5] == ACS_CKBOARD) {
+                                    velocityY *= -1;
+                                    velocityX *= -1;
+                                    yDidBounceAlready = 1;
+                                    xDidBounceAlready = 1;
+                                    collisionCase = 999;
+                                }
+                                else collisionCase = 999;
                             }
                             else collisionCase = 7;
                             break;
                         case 7:
                             // lower right
-                            if ((aroundBall[7] == ACS_ULCORNER) && (velocityX > 0) && (velocityY > 0)) {
-                                bricks[((ballY+1)-1)/2][((ballX+1)-1)/brickLength] = 0;
-                                velocityX = velocityX * -1;
-                                velocityY = velocityY * -1;
-                                playerScore = playerScore + scoreMultiplier;
-                                scoreMultiplier = increaseMult(scoreMultiplier);
-                                collisionCase = 999;
+                            if ((aroundBall[7] != ' ') && (velocityX > 0) && (velocityY > 0) && !(xDidBounceAlready || yDidBounceAlready)) {
+                                if (aroundBall[7] == ACS_ULCORNER) {
+                                    bricks[((ballY + 1) - 1) / 2][((ballX + 1) - 1) / brickLength] = 0;
+                                    velocityX *= -1;
+                                    velocityY *= -1;
+                                    playerScore += scoreMultiplier;
+                                    scoreMultiplier = increaseMult(scoreMultiplier, 1);
+                                    collisionCase = 999;
+                                    yDidBounceAlready = 1;
+                                    xDidBounceAlready = 1;
+                                }
+                                else if (aroundBall[7] == ACS_CKBOARD) {
+                                    velocityY *= -1;
+                                    velocityX *= -1;
+                                    yDidBounceAlready = 1;
+                                    xDidBounceAlready = 1;
+                                    collisionCase = 999;
+                                }
+                                else collisionCase = 999;
                             }
                             else collisionCase = 999;
                             break;
                         case 8:
                             // left if top or bottom
-                            if (aroundBall[3] != ' ') {
+                            if ((aroundBall[3] != ' ') && (velocityX < 0) && !xDidBounceAlready) {
                                 if (aroundBall[3] == ACS_URCORNER) {
-                                    bricks[(ballY-1)/2][((ballX-1)-brickLength)/brickLength] = 0;
-                                    velocityX = velocityX * -1;
-                                    playerScore = playerScore + scoreMultiplier;
-                                    scoreMultiplier = increaseMult(scoreMultiplier);
+                                    bricks[(ballY - 1) / 2][((ballX - 1) - brickLength) / brickLength] = 0;
+                                    velocityX *= -1;
+                                    playerScore += scoreMultiplier;
+                                    scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 999;
                                 }
                                 else if (aroundBall[3] == ACS_LRCORNER) {
-                                    bricks[(ballY-2)/2][((ballX-1)-brickLength)/brickLength] = 0;
-                                    velocityX = velocityX * -1;
-                                    playerScore = playerScore + scoreMultiplier;
-                                    scoreMultiplier = increaseMult(scoreMultiplier);
+                                    bricks[(ballY - 2) / 2][((ballX - 1) - brickLength) / brickLength] = 0;
+                                    velocityX *= -1;
+                                    playerScore += scoreMultiplier;
+                                    scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 999;
                                 }
                                 else if (aroundBall[3] == ACS_VLINE) {
                                     if (ballX == 1) {
-                                        velocityX = velocityX * -1;
+                                        velocityX *= -1;
                                         collisionCase = 999;
                                     }
                                 }
-                                else collisionCase = 9;
+                                else collisionCase = 999;
+                                xDidBounceAlready = 1;
                             }
                             else collisionCase = 9;
                             break;
                         case 9:
                             // right if top or bottom
-                            if (aroundBall[4] != ' ') {
+                            if ((aroundBall[4] != ' ') && (velocityX > 0) && !xDidBounceAlready) {
                                 if (aroundBall[4] == ACS_ULCORNER) {
-                                    bricks[(ballY-1)/2][((ballX+1)-1)/brickLength] = 0;
-                                    velocityX = velocityX * -1;
-                                    playerScore = playerScore + scoreMultiplier;
-                                    scoreMultiplier = increaseMult(scoreMultiplier);
+                                    bricks[(ballY - 1) / 2][((ballX + 1) - 1) / brickLength] = 0;
+                                    velocityX *= -1;
+                                    playerScore += scoreMultiplier;
+                                    scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 999;
                                 }
                                 else if (aroundBall[4] == ACS_LLCORNER) {
-                                    bricks[(ballY-2)/2][((ballX+1)-1)/brickLength] = 0;
-                                    velocityX = velocityX * -1;
-                                    playerScore = playerScore + scoreMultiplier;
-                                    scoreMultiplier = increaseMult(scoreMultiplier);
+                                    bricks[(ballY - 2) / 2][((ballX + 1) - 1) / brickLength] = 0;
+                                    velocityX *= -1;
+                                    playerScore += scoreMultiplier;
+                                    scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 999;
                                 }
                                 else if (aroundBall[4] == ACS_VLINE) {
                                     if (ballX + 2 == width) {
-                                        velocityX = velocityX * -1;
+                                        velocityX *= -1;
                                         collisionCase = 999;
                                     }
                                 }
                                 else collisionCase = 999;
+                                xDidBounceAlready = 1;
                             }
                             else collisionCase = 999;
                             break;
@@ -476,99 +652,193 @@ int main(void) {
                             break;
                     }
                 }
+                collisionUpdate = 1;
             }
-            didUpdate = 1;
+            ballUpdate = 1;
         }
         
+        /* END INPUT AND MOVEMENT SECTION */
+        
+        /* BEGIN RENDERING SECTION */
+        
         // Update the bricks if an update occurs
-        if (didUpdate) {
-            for (i = 0; i < brickRows; i++) {
-                for (j = 0; j < brickColumns; j++) {
-                    if (bricks[i][j] == 1) {
-                        // Left side of brick
-                        mvwaddch(gamescr,(i*2)+1,(j*brickLength)+1,ACS_ULCORNER);
-                        mvwaddch(gamescr,(i*2)+2,(j*brickLength)+1,ACS_LLCORNER);
-                        // Middle portions of brick, variable length just in case
-                        for (n = 1; n < brickLength - 1; n++) {
-                            mvwaddch(gamescr,(i*2)+1,(j*brickLength)+n+1,ACS_HLINE);
-                            mvwaddch(gamescr,(i*2)+2,(j*brickLength)+n+1,ACS_HLINE);
+        if (collisionUpdate) {
+            levelComplete = 1;
+            do {
+                for (i = 0; i < brickRows; i++) {
+                    for (j = 0; j < brickColumns; j++) {
+                        if (bricks[i][j] == 1) {
+                            levelComplete = 0;
+                            // Left side of brick
+                            mvwaddch(gamescr,(i*2)+1,(j*brickLength)+1,ACS_ULCORNER);
+                            mvwaddch(gamescr,(i*2)+2,(j*brickLength)+1,ACS_LLCORNER);
+                            // Middle portions of brick, variable length just in case
+                            for (n = 1; n < brickLength - 1; n++) {
+                                mvwaddch(gamescr,(i*2)+1,(j*brickLength)+n+1,ACS_HLINE);
+                                mvwaddch(gamescr,(i*2)+2,(j*brickLength)+n+1,ACS_HLINE);
+                            }
+                            // Right side of brick
+                            mvwaddch(gamescr,(i*2)+1,(j*brickLength)+n+1,ACS_URCORNER);
+                            mvwaddch(gamescr,(i*2)+2,(j*brickLength)+n+1,ACS_LRCORNER);
                         }
-                        // Right side of brick
-                        mvwaddch(gamescr,(i*2)+1,(j*brickLength)+n+1,ACS_URCORNER);
-                        mvwaddch(gamescr,(i*2)+2,(j*brickLength)+n+1,ACS_LRCORNER);
-                    }
-                    else {
-                        mvwaddch(gamescr,(i*2)+1,(j*brickLength)+1,' ');
-                        mvwaddch(gamescr,(i*2)+2,(j*brickLength)+1,' ');
-                        for (n = 1; n < brickLength - 1; n++) {
+                        else {
+                            mvwaddch(gamescr,(i*2)+1,(j*brickLength)+1,' ');
+                            mvwaddch(gamescr,(i*2)+2,(j*brickLength)+1,' ');
+                            for (n = 1; n < brickLength - 1; n++) {
+                                mvwaddch(gamescr,(i*2)+1,(j*brickLength)+n+1,' ');
+                                mvwaddch(gamescr,(i*2)+2,(j*brickLength)+n+1,' ');
+                            }
                             mvwaddch(gamescr,(i*2)+1,(j*brickLength)+n+1,' ');
                             mvwaddch(gamescr,(i*2)+2,(j*brickLength)+n+1,' ');
                         }
-                        mvwaddch(gamescr,(i*2)+1,(j*brickLength)+n+1,' ');
-                        mvwaddch(gamescr,(i*2)+2,(j*brickLength)+n+1,' ');
                     }
                 }
-            }
-            mvwaddch(gamescr, ballY, ballX , 'o');
-            if (ballsRemaining < 0) {
-                mvwaddch(gamescr, ballY, ballX, ' ');
-            }
+                
+                /*                  LEVEL COMPLETE
+                 * Okay, so this part is kind of a hack. I needed
+                 * something that could detect when all of the bricks
+                 * were gone (set to 0), and I wanted to do so without
+                 * adding too many extra cycles to the game. Since the
+                 * brick renderer already does this, I figured that it
+                 * would be best to place the check in here. If there
+                 * are any bricks left, then this check will return
+                 * false and the loop to rerender will not continue either.
+                 */
+                
+                if (levelComplete) {
+                    if (argc == 2) {
+                        if ((ch = buffer[x]) != '%') {
+                            i = 0;
+                            if (buffer[x] == '*') {
+                                while (buffer[x++] != '\n') {
+                                }
+                            }
+                            while ((ch = buffer[x++]) != '\n') {
+                                title[i++] = ch;
+                            }
+                            for (i = 0; i < brickRows; i++) {
+                                for (j = 0; j < brickColumns; j++) {
+                                    bricks[i][j] = buffer[x++] - '0';
+                                }
+                                x++;
+                            }
+                            didReset = 1;
+                        }
+                        else {
+                            victory = 1;
+                            levelComplete = 0;
+                        }
+                    }
+                    else {
+                        for (i = 0; i < brickRows; i++) {
+                            for (j = 0; j < brickColumns; j++) {
+                                bricks[i][j] = 1;
+                            }
+                        }
+                        didReset = 1;
+                    }
+                    mvwaddch(gamescr, ballY, ballX , ' ');
+                    playerScore += 10 * scoreMultiplier;
+                    ballX = width / 2;
+                    ballY = height - 3;
+                    velocityY = -1;
+                    for (i = 0; i <= paddleLength; i++) {
+                        mvwaddch(gamescr, height - 2, paddlePosition + i, ' ');
+                    }
+                    paddlePosition = (width/2) - (paddleLength/2);
+                    paddleUpdate = 1;
+                    ballUpdate = 1;
+                }
+                
+            } while (levelComplete);
         }
         
-        // Update the paddle if an update occurs
-        if (didUpdate) {
+        if (ballUpdate && ballsRemaining > -1) {
+                mvwaddch(gamescr, ballY, ballX , 'o');
+        }
+        
+        // Update the paddle if a paddleUpdate occurs
+        if (paddleUpdate) {
             for (i = 0; i <= paddleLength; i++) {
-                mvwaddch(gamescr, height - 2, paddlePosition + i, '#');
+                mvwaddch(gamescr, height - 2, paddlePosition + i, ACS_CKBOARD);
             }
         }
         
         // Update the score, ball count, and multiplier
-        if (didUpdate) {
-            wclear(score_win);
-            mvwprintw(score_win, 0, 0, "LIVES");
+        if (collisionUpdate) {
+            mvwprintw(scoreWin, 0, 0, "LIVES");
+            mvwprintw(scoreWin, 0, 6, " ");
             for (i = 0; i < ballsRemaining; i++) {
-                mvwaddch(score_win, 0, (i * 2) + 6, 'o');
+                mvwprintw(scoreWin, 0, (i * 2) + 6, "o  ");
             }
-            mvwprintw(score_win, 0, 30, "MULTIPLIER x%d", scoreMultiplier);
-            mvwprintw(score_win, 1, 0, "SCORE %d", playerScore);
+            mvwprintw(scoreWin, 0, width-14, "%2dX MULTIPLIER", scoreMultiplier);
+            mvwprintw(scoreWin, 1, 0, "SCORE %d", playerScore);
+            mvwprintw(scoreWin, 1, width/2 - (strlen(title)/2), "%s", title);
         }
         
-        // Update the screen, and reset the didUpdate variable
-        if (didUpdate) {
-            didUpdate = 0;
-            wrefresh(gamescr);
-            wrefresh(score_win);
+        /* END RENDERING SECTION */
+        
+        /* BEGIN REDRAW SECTION */
+        
+        // Update the screen, and reset the Update variables
+        if (collisionUpdate) {
+            wnoutrefresh(scoreWin);
+        }
+        if (ballUpdate || paddleUpdate) {
+            wnoutrefresh(gamescr);
 #ifdef DEBUG
-            wrefresh(debug_win);
+            wnoutrefresh(debug_win);
 #endif
-            if (didDie && (ballsRemaining > -1)) {
-                didDie = 0;
+        }
+        if (collisionUpdate || ballUpdate || paddleUpdate) {
+            doupdate();
+            ballUpdate = 0;
+            paddleUpdate = 0;
+            collisionUpdate = 0;
+            if (didReset && (ballsRemaining > -1)) {
+                didReset = 0;
                 usleep(1000000);
             }
             // Game Over screen
-            else if (didDie) {
+            else if (didReset) {
                 nodelay(stdscr, FALSE);
                 gameOverWin = newwin(9, 32, (LINES - 9) / 2, (COLS - 32) / 2);
                 wborder(gameOverWin, ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE, ACS_ULCORNER, ACS_URCORNER, ACS_LLCORNER, ACS_LRCORNER);
                 mvwprintw(gameOverWin, 2, 11, "GAME OVER");
                 mvwprintw(gameOverWin, 4, (32 - (6 + (log10(playerScore)))) / 2, "SCORE %d", playerScore);
-                mvwprintw(gameOverWin, 6, 12, "(Q)uit");
+                mvwprintw(gameOverWin, 6, 13, "(Q)uit");
                 wrefresh(gameOverWin);
                 while ((ch = getch()) != 'q'){
                     usleep(10);
                 }
-                endwin();
-                return 0;
+                quitFlag = 1;
+            }
+            // Victory screen. It's just the game over screen with a different message at present.
+            if (victory) {
+                nodelay(stdscr, FALSE);
+                gameOverWin = newwin(9, 32, (LINES - 9) / 2, (COLS - 32) / 2);
+                wborder(gameOverWin, ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE, ACS_ULCORNER, ACS_URCORNER, ACS_LLCORNER, ACS_LRCORNER);
+                mvwprintw(gameOverWin, 2, 12, "YOU WIN!");
+                mvwprintw(gameOverWin, 4, (32 - (6 + (log10(playerScore)))) / 2, "SCORE %d", playerScore);
+                mvwprintw(gameOverWin, 6, 13, "(Q)uit");
+                wrefresh(gameOverWin);
+                while ((ch = getch()) != 'q'){
+                    usleep(10);
+                }
+                quitFlag = 1;
             }
         }
+        
+        /* END REDRAW SECTION */
     }
     endwin();
     return 0;
 }
 
-int increaseMult(int currentMultiplier) {
+// increases the current multiplier, but no higher than 20X
+int increaseMult(int currentMultiplier, int AmountToAdd) {
     if (currentMultiplier < 20)
-        return (currentMultiplier + 1);
+        return (currentMultiplier + AmountToAdd);
     else
         return currentMultiplier;
 }
