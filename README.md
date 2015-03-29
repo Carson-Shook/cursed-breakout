@@ -22,6 +22,7 @@ For debugging, type `make debug` when compiling. You may need to type `make clea
 - Added title screen with level selection
 - Added debug feature: press 's' to skip the current level
 - Fixed an issue where the ball could break out of the game field when hitting the paddle and wall at the same time
+
 #### v1.0 beta 1
 - Added custom level system (see example.lvl for formatting)
 - Added pause screen and moved the quit option into it
