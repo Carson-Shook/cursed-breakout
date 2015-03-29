@@ -1,25 +1,27 @@
-# cursed-breakout v1.0 beta 1
-The beloved brick breaking game now running in your favorite terminal emulator! While browsing GitHub, I was unable to find any Breakout clones that were made in pure C (or at least using common C libraries), so I decided to rectify this. Cursed-breakout is built using the ncurses library, hence the name, and should run on most Posix systems, though it is under active development and this is not currently guaranteed. Once in a more polished state, I'll start making the appropriate optimizations to ensure smooth sailing on other systems.
+# cursed-breakout v1.0 beta 2
+The beloved brick breaking game now running in your favorite terminal emulator! While browsing GitHub, I was unable to find any Breakout clones that were made in pure C (or at least using common C libraries), so I decided to rectify this. Cursed-breakout is built using the ncurses library, hence the name, and should run on most Posix systems. I'll do my best to check for support, but it would really help if you could test it on your system.
 
 It`s just a fun little project, and anyone who wants may use it for commercial or non-commercial projects, as long as the usage adheres to the MIT license. Have fun!
 
-### Current Features
+### Features
 Move the paddle left and right with the left and right arrow keys to bounce the ball. You can also use the up and down arrow keys if you want to move slower. Try to break all of the bricks in each level by bouncing the ball into them. Each brick broken increases your multiplier. Every level you complete earns 10 x the multiplier in points. Don't lose all of your lives, and try to achieve a high score.
 
 Press `p` to pause. Once paused, press it again to resume, or press `q` to quit.
 
 To create your own levels, have a look at the included `example.lvl` file.
 
-### Features Under Development
-- Level selection
+### Possible Future Features
 - Level format verification
-- ~~A method to capture key presses (`key_up` and `key_down` sorts of things) to improve paddle movement~~ *I've found that this is basically impossible at the moment, but if anyone knows a way to get the events and write appropriate handlers for them, let me know.*
 
 # Build Instructions
 Type `make` to build the program, and `./breakout` (or `./breakout example.lvl`) to run it.
 For debugging, type `make debug` when compiling. You may need to type `make clean` before doing so if you have already built it normally. Make sure that you choose an ample size for your terminal emulator if you use the debug info. It may overlap the game if you do not. 
 
 # Changelog
+#### v1.0 beta 2
+- Added title screen with level selection
+- Added debug feature: press 's' to skip the current level
+- Fixed an issue where the ball could break out of the game field when hitting the paddle and wall at the same time
 #### v1.0 beta 1
 - Added custom level system (see example.lvl for formatting)
 - Added pause screen and moved the quit option into it

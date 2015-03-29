@@ -12,3 +12,6 @@ clean:
 debug: CFLAGS+=-DDEBUG=1
 debug: $(OBJS)
 	$(CC) $(CFLAGS) $(OBJS) $(LDFLAGS)
+
+love:
+	clear;echo "not war"

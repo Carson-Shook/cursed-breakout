@@ -30,7 +30,7 @@
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
-//#include <dirent.h> I should be using this later
+#include <dirent.h>
 #include <string.h>
 #include <time.h>
 #include <ncurses.h>
@@ -80,19 +80,28 @@ int main(int argc, char *argv[]) {
     int collisionUpdate = 1;                    // flag to trip if bricks update
     int didReset = 1;                           // flag to trigger death sequence actions
     int levelComplete = 1;                      // flag to trigger next level sequence
-    int victory = 0;
+    int victory = 0;                            // flag to trigger victory quit sequence
     int quitFlag = 0;                           // flag to trigger quit sequence
+    int fileProvided = 0;                       // flag to indicated that a file is available for reading
+    int ready = 0;                              // flag that indicates player is ready to move past the main menu
     
     unsigned int playerScore = 0;               // the player's score
     int scoreMultiplier = 1;                    // the current score multiplier
     int ballsRemaining = 3;                     // number of lives the player has
     
+    WINDOW *fileOpenWin;                        // the file manager window
     WINDOW *gamescr;                            // the game screen window
     WINDOW *scoreWin;                           // the score and life-count window
     WINDOW *gameOverWin;                        // the game over window
 #ifdef DEBUG
     WINDOW *debug_win;                          // debug window (I should hope that to be obvious enough)
 #endif
+    
+    FILE *levels;                               // file pointer for accessing any level files
+    char *buffer;                               // dynamically allocated buffer that holds all level data
+    char title[50];                             // level title
+    
+    DIR *currentDir;                            // directory to read from
     
 #ifndef DEBUG
     // Check terminal size before starting
@@ -102,11 +111,21 @@ int main(int argc, char *argv[]) {
     }
 #endif
     
-    FILE *levels;                               // file pointer for accessing any level files
-    char *buffer;                               // dynamically allocated buffer that holds all level data
-    char title[50];                             // level title
+    /* BEGIN CURSES INITIALIZATION SECTION */
     
-    /* BEGIN FILE READ SECTION */
+    // enters curses mode and sets window properties
+    initscr();
+    cbreak();
+    noecho();
+    leaveok(stdscr, TRUE);
+    keypad(stdscr, TRUE);
+    nodelay(stdscr, FALSE);
+    curs_set(0);
+    refresh();      // clear the stdscr buffer before doing anything
+    
+    /* END CURSES INITIALIZATION SECTION */
+    
+    /* BEGIN FILE READ/MAIN MENU SECTION */
     
     // This is where the provided file is copied into the buffer, and
     // the first level is copied into the brick array. Otherwise, a
@@ -114,6 +133,7 @@ int main(int argc, char *argv[]) {
         levels = fopen(argv[1], "r");
         if (levels) {
             if (fseeko(levels, 0 , SEEK_END) != 0) {
+                fclose(levels);
                 printf("Error: The file is empty\n");
                 return 2;
             }
@@ -122,13 +142,151 @@ int main(int argc, char *argv[]) {
             rewind(levels);
             fread(buffer, sizeof(char), file_size, levels);
             fclose(levels);
+            fileProvided = 1;
         }
         else {
             fclose(levels);
+            printf("Error: There was a problem reading the file\n");
             return 1;
         }
+    }
+    else {
+        fileOpenWin = newwin(height, width, ((LINES - height) / 2) - (scoreWinHeight / 2), (COLS - width) / 2);
+        mvwprintw(fileOpenWin, 2, width/2 - 7, "CURSED-BREAKOUT");
+        mvwprintw(fileOpenWin, 4, width/2 - 27, "Copyright (c) 2015 Carson Shook under the MIT License");
+        wrefresh(fileOpenWin);
         
-        // Set first level
+        // Borrowed some code from this GitHub repo: https://github.com/morganwilde/labyrinth
+        // since it was almost exactly what I needed, and documentation was scarce.
+        currentDir = opendir(".");
+        struct dirent *dirStream = readdir(currentDir);
+        char **files = malloc(sizeof(char *) * 1);
+        files[0] = 0;
+        // counter to place the files in an array
+        n = 0;
+        while (dirStream) {
+            if ((dirStream = readdir(currentDir)) != NULL) {
+                // find files ending with ".lvl"
+                char *found = strstr(dirStream->d_name, ".lvl");
+                if (found != NULL) {
+                    // Save as an option
+                    files = realloc(files, sizeof(char *) * (n+1));
+                    files[n] = calloc(strlen(dirStream->d_name)+1, sizeof(char));
+                    strcpy(files[n], dirStream->d_name);
+                    n++;
+                }
+            }
+        }
+        
+        closedir(currentDir);
+        while (!ready) {
+            mvwprintw(fileOpenWin, 7, width/2 - 35, "             (F)ile Select     (I)nfinite Mode     (Q)uit             \n\n\n\n\n\n\n\n\n\n\n\n\n");
+            wborder(fileOpenWin, ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE, ACS_ULCORNER, ACS_URCORNER, ACS_LLCORNER, ACS_LRCORNER);
+            wrefresh(fileOpenWin);
+
+            // Select a menu option
+            switch (ch = getch()) {
+                case 'f':
+                    mvwprintw(fileOpenWin, 7, width/2 - 35, "Select a file with the arrow keys and press (S)elect, or press (B)ack");
+                    
+                    i = 0; // file selection and offset
+                    j = 0; // counter
+                    while (!ready && (ch != 'b')) {
+                        
+                        char *filename = malloc(sizeof(char) * 0);
+                        // this is just to clear the screen
+                        mvwprintw(fileOpenWin, 8, width/2 - 35, "\n\n\n\n\n\n\n\n\n\n\n\n\n");
+                        wborder(fileOpenWin, ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE, ACS_ULCORNER, ACS_URCORNER, ACS_LLCORNER, ACS_LRCORNER);
+                        j = 0 + i - (i % 10);
+                        if (files[0] != 0) {
+                            while ((j < n) && (j < i - (i % 10) + 10)) {
+                                filename = files[j];
+                                // print the list of files
+                                mvwprintw(fileOpenWin, 9 + j - (10 * (i / 10)), 5, "   %s", filename);
+                                j++;
+                            }
+                            mvwprintw(fileOpenWin, 9 + i - (10 * (i / 10)), 5, ">");
+                            wrefresh(fileOpenWin);
+                            
+                            // use curser keys to choose a file to read
+                            switch (ch = getch()) {
+                                case KEY_DOWN:
+                                    if (i < n - 1) {
+                                        i++;
+                                    }
+                                    break;
+                                case KEY_UP:
+                                    if (i > 0) {
+                                        i--;
+                                    }
+                                    break;
+                                case KEY_LEFT:
+                                    if (i > 9) {
+                                        i -= 10;
+                                    }
+                                    break;
+                                case KEY_RIGHT:
+                                    if (i - (i % 10) + 10 < n - 1) {
+                                        i = i - (i % 10) + 10;
+                                    }
+                                    break;
+                                case 's':
+                                    // attempt to read the file
+                                    levels = fopen(files[i], "r");
+                                    if (levels) {
+                                        if (fseeko(levels, 0 , SEEK_END) != 0) {
+                                            fclose(levels);
+                                            endwin();
+                                            printf("Error: The file is empty\n");
+                                            return 2;
+                                        }
+                                        int file_size = ftello(levels);
+                                        buffer = (char*)malloc(file_size);
+                                        rewind(levels);
+                                        fread(buffer, sizeof(char), file_size, levels);
+                                        fclose(levels);
+                                        fileProvided = 1;
+                                        ready = 1;
+                                    }
+                                    else {
+                                        fclose(levels);
+                                        endwin();
+                                        printf("Error: There was a problem reading the file\n");
+                                        return 1;
+                                    }
+                                    break;
+                                case 'b':
+                                    break;
+                            }
+                        }
+                        else {
+                            mvwprintw(fileOpenWin, 9+i, 8, "NO FILES FOUND", filename);
+                            wrefresh(fileOpenWin);
+                            usleep(1500000);
+                            ch = 'b';
+                        }
+                    }
+                    break;
+                case 'i':
+                    ready = 1;
+                    break;
+                case 'q':
+                    endwin();
+                    return 0;
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+    delwin(fileOpenWin);
+    
+    /* END FILE READ/MAIN MENU SECTION */
+    
+    /* BEGIN GAME INITIALIZATION SECTION */
+    
+    // setup first level
+    if (fileProvided == 1) {
         if ((ch = buffer[x]) != '%') {
             i = 0;
             if (buffer[x] == '*') {
@@ -138,6 +296,7 @@ int main(int argc, char *argv[]) {
             while ((ch = buffer[x++]) != '\n') {
                 title[i++] = ch;
             }
+            title[i] = '\0';
             for (i = 0; i < brickRows; i++) {
                 for (j = 0; j < brickColumns; j++) {
                     bricks[i][j] = buffer[x++] - '0';
@@ -151,7 +310,6 @@ int main(int argc, char *argv[]) {
             levelComplete = 0;
         }
     }
-    // Set first level for infinite mode
     else {
         for (i = 0; i < brickRows; i++) {
             for (j = 0; j < brickColumns; j++) {
@@ -160,10 +318,6 @@ int main(int argc, char *argv[]) {
         }
         strcpy(title, "Infinite Mode");
     }
-    
-    /* END FILE READ SECTION */
-    
-    /* BEGIN INITIALIZATION SECTION */
     
     // set initial paddle position and ball location
     paddlePosition = (width / 2) - (paddleLength / 2);
@@ -175,24 +329,19 @@ int main(int argc, char *argv[]) {
     // initializing all values to 1
     brickLength = (width - 2) / brickColumns;
     
-    // enters curses mode and sets window properties
-    initscr();
     gamescr = newwin(height, width, ((LINES - height) / 2) - (scoreWinHeight / 2), (COLS - width) / 2);
     scoreWin = newwin(scoreWinHeight, width, ((LINES - height) / 2) + height - (scoreWinHeight / 2), (COLS - width) / 2);
 #ifdef DEBUG
     debug_win = newwin(4, width, 0, 0);
 #endif
     wborder(gamescr, ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE, ACS_ULCORNER, ACS_URCORNER, ACS_LLCORNER, ACS_LRCORNER);
-    cbreak();
-    noecho();
-    leaveok(stdscr, TRUE);
-    keypad(stdscr, TRUE);
+    
     nodelay(stdscr, TRUE);
     curs_set(0);
     xTimer = clock();
     yTimer = clock();
     
-    /* END INITIALIZATION SECTION */
+    /* END GAME INITIALIZATION SECTION */
     
     while (!quitFlag) {
         
@@ -260,6 +409,16 @@ int main(int argc, char *argv[]) {
                     collisionUpdate = 1;
                     nodelay(stdscr, TRUE);
                     break;
+                case 's':
+#ifdef DEBUG
+                    for (i = 0; i < brickRows; i++) {
+                        for (j = 0; j < brickColumns; j++) {
+                            bricks[i][j] = 0;
+                        }
+                    }
+                    collisionUpdate = 1;
+#endif
+                    break;
             }
         }
         
@@ -323,8 +482,7 @@ int main(int argc, char *argv[]) {
                  * update section of the main program, and setting that array
                  * value to zero. It also flips the appropriate velocity.
                  *
-                 * There are likely a good number of bugs still hiding in here.
-                 * TODO: fix wierd collision case that I can't quite pin down ATM.
+                 * There might still be bugs still hiding in here.
                  */
                 
                 collisionCase = 0;
@@ -413,7 +571,7 @@ int main(int argc, char *argv[]) {
                                     else if (yDelay < universalDelay + delayAdjuster * 20) {
                                         yDelay = universalDelay + delayAdjuster * 20;
                                     }
-                                    collisionCase = 999;
+                                    collisionCase = 8;
                                 }
                                 else if (aroundBall[6] == ACS_ULCORNER) {
                                     bricks[(((ballY + 1) - 1) / 2)][(ballX - 1) / brickLength] = 0;
@@ -706,7 +864,7 @@ int main(int argc, char *argv[]) {
                  */
                 
                 if (levelComplete) {
-                    if (argc == 2) {
+                    if (fileProvided == 1) {
                         if ((ch = buffer[x]) != '%') {
                             i = 0;
                             if (buffer[x] == '*') {
@@ -716,6 +874,7 @@ int main(int argc, char *argv[]) {
                             while ((ch = buffer[x++]) != '\n') {
                                 title[i++] = ch;
                             }
+                            title[i] = '\0';
                             for (i = 0; i < brickRows; i++) {
                                 for (j = 0; j < brickColumns; j++) {
                                     bricks[i][j] = buffer[x++] - '0';
