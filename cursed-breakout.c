@@ -86,6 +86,8 @@ int main(int argc, char *argv[]) {
     int ready = 0;                              // flag that indicates player is ready to move past the main menu
     
     unsigned int playerScore = 0;               // the player's score
+    int newBallScoreCounter = 0;                // keeps track of the points necessary to win a new ball
+    const unsigned int SCORE_TO_NEW_BALL = 2000;
     int scoreMultiplier = 1;                    // the current score multiplier
     int ballsRemaining = 3;                     // number of lives the player has
     
@@ -128,7 +130,9 @@ int main(int argc, char *argv[]) {
     /* BEGIN FILE READ/MAIN MENU SECTION */
     
     // This is where the provided file is copied into the buffer, and
-    // the first level is copied into the brick array. Otherwise, a
+    // the first level is copied into the brick array. Otherwise, the
+    // main menu is displayed.
+    
     if (argc == 2) {
         levels = fopen(argv[1], "r");
         if (levels) {
@@ -180,7 +184,7 @@ int main(int argc, char *argv[]) {
         
         closedir(currentDir);
         while (!ready) {
-            mvwprintw(fileOpenWin, 7, width/2 - 35, "             (F)ile Select     (I)nfinite Mode     (Q)uit             \n\n\n\n\n\n\n\n\n\n\n\n\n");
+            mvwprintw(fileOpenWin, 7, width/2 - 35, "             (F)ile Select     (I)nfinite Mode     (Q)uit             \n\n\n\n\n\n\n\n\n\n\n\n\n\n");
             wborder(fileOpenWin, ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE, ACS_ULCORNER, ACS_URCORNER, ACS_LLCORNER, ACS_LRCORNER);
             wrefresh(fileOpenWin);
 
@@ -188,7 +192,7 @@ int main(int argc, char *argv[]) {
             switch (ch = getch()) {
                 case 'f':
                     mvwprintw(fileOpenWin, 7, width/2 - 35, "Select a file with the arrow keys and press (S)elect, or press (B)ack");
-                    
+                    // n (used earlier) represents the total number of files
                     i = 0; // file selection and offset
                     j = 0; // counter
                     while (!ready && (ch != 'b')) {
@@ -205,7 +209,15 @@ int main(int argc, char *argv[]) {
                                 mvwprintw(fileOpenWin, 9 + j - (10 * (i / 10)), 5, "   %s", filename);
                                 j++;
                             }
+                            // print the selection arrow
                             mvwprintw(fileOpenWin, 9 + i - (10 * (i / 10)), 5, ">");
+                            mvwprintw(fileOpenWin, 20, 8, "    ");
+                            if ((n > 9) && (i < n - (n % 10))) {
+                                mvwprintw(fileOpenWin, 20, 10, "->");
+                            }
+                            if ((n > 9) && (i > 9)) {
+                                mvwprintw(fileOpenWin, 20, 8, "<-");
+                            }
                             wrefresh(fileOpenWin);
                             
                             // use curser keys to choose a file to read
@@ -226,7 +238,7 @@ int main(int argc, char *argv[]) {
                                     }
                                     break;
                                 case KEY_RIGHT:
-                                    if (i - (i % 10) + 10 < n - 1) {
+                                    if (i - (i % 10) + 10 < n) {
                                         i = i - (i % 10) + 10;
                                     }
                                     break;
@@ -255,6 +267,7 @@ int main(int argc, char *argv[]) {
                                         return 1;
                                     }
                                     break;
+                                    // go back
                                 case 'b':
                                     break;
                             }
@@ -313,7 +326,7 @@ int main(int argc, char *argv[]) {
     else {
         for (i = 0; i < brickRows; i++) {
             for (j = 0; j < brickColumns; j++) {
-                bricks[i][j] = 1;
+                bricks[i][j] = (int)difftime(clock(),xTimer) % 2;
             }
         }
         strcpy(title, "Infinite Mode");
@@ -497,6 +510,7 @@ int main(int argc, char *argv[]) {
                                     bricks[(((ballY - 1) - 2) / 2)][(ballX - 1) / brickLength] = 0;
                                     velocityY *= -1;
                                     playerScore += scoreMultiplier;
+                                    newBallScoreCounter += scoreMultiplier;
                                     scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 8;
                                 }
@@ -504,6 +518,7 @@ int main(int argc, char *argv[]) {
                                     bricks[(((ballY - 1) - 2) / 2)][((ballX - 1) - (brickLength - 1)) / brickLength] = 0;
                                     velocityY *= -1;
                                     playerScore += scoreMultiplier;
+                                    newBallScoreCounter += scoreMultiplier;
                                     scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 8;
                                 }
@@ -516,6 +531,7 @@ int main(int argc, char *argv[]) {
                                         bricks[(((ballY - 1) - 2) / 2)][(ballX - (ballX % (brickLength))) / brickLength] = 0;
                                         velocityY *= -1;
                                         playerScore += scoreMultiplier;
+                                        newBallScoreCounter += scoreMultiplier;
                                         scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                         collisionCase = 999;
                                     }
@@ -577,6 +593,7 @@ int main(int argc, char *argv[]) {
                                     bricks[(((ballY + 1) - 1) / 2)][(ballX - 1) / brickLength] = 0;
                                     velocityY *= -1;
                                     playerScore += scoreMultiplier;
+                                    newBallScoreCounter += scoreMultiplier;
                                     scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 8;
                                 }
@@ -584,6 +601,7 @@ int main(int argc, char *argv[]) {
                                     bricks[(((ballY + 1) - 1) / 2)][((ballX - 1) - (brickLength - 1)) / brickLength] = 0;
                                     velocityY *= -1;
                                     playerScore += scoreMultiplier;
+                                    newBallScoreCounter += scoreMultiplier;
                                     scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 8;
                                 }
@@ -608,6 +626,7 @@ int main(int argc, char *argv[]) {
                                         bricks[(((ballY + 1) - 1) / 2)][(ballX - (ballX % (brickLength))) / brickLength] = 0;
                                         velocityY *= -1;
                                         playerScore += scoreMultiplier;
+                                        newBallScoreCounter += scoreMultiplier;
                                         scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                         collisionCase = 999;
                                     }
@@ -624,6 +643,7 @@ int main(int argc, char *argv[]) {
                                     bricks[(ballY - 1) / 2][((ballX - 1) - (brickLength - 1)) / brickLength] = 0;
                                     velocityX *= -1;
                                     playerScore += scoreMultiplier;
+                                    newBallScoreCounter += scoreMultiplier;
                                     scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 999;
                                 }
@@ -631,6 +651,7 @@ int main(int argc, char *argv[]) {
                                     bricks[(ballY - 2) / 2][((ballX - 1) - (brickLength - 1)) / brickLength] = 0;
                                     velocityX *= -1;
                                     playerScore += scoreMultiplier;
+                                    newBallScoreCounter += scoreMultiplier;
                                     scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 999;
                                 }
@@ -652,6 +673,7 @@ int main(int argc, char *argv[]) {
                                     bricks[(ballY - 1) / 2][((ballX + 1) - 1) / brickLength] = 0;
                                     velocityX *= -1;
                                     playerScore += scoreMultiplier;
+                                    newBallScoreCounter += scoreMultiplier;
                                     scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 999;
                                 }
@@ -659,6 +681,7 @@ int main(int argc, char *argv[]) {
                                     bricks[(ballY - 2) / 2][((ballX + 1) - 1) / brickLength] = 0;
                                     velocityX *= -1;
                                     playerScore += scoreMultiplier;
+                                    newBallScoreCounter += scoreMultiplier;
                                     scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 999;
                                 }
@@ -680,6 +703,7 @@ int main(int argc, char *argv[]) {
                                 velocityX *= -1;
                                 velocityY *= -1;
                                 playerScore += scoreMultiplier;
+                                newBallScoreCounter += scoreMultiplier;
                                 scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                 collisionCase = 999;
                                 yDidBounceAlready = 1;
@@ -694,6 +718,7 @@ int main(int argc, char *argv[]) {
                                 velocityX *= -1;
                                 velocityY *= -1;
                                 playerScore += scoreMultiplier;
+                                newBallScoreCounter += scoreMultiplier;
                                 scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                 collisionCase = 999;
                                 yDidBounceAlready = 1;
@@ -709,6 +734,7 @@ int main(int argc, char *argv[]) {
                                     velocityX *= -1;
                                     velocityY *= -1;
                                     playerScore += scoreMultiplier;
+                                    newBallScoreCounter += scoreMultiplier;
                                     scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 999;
                                     yDidBounceAlready = 1;
@@ -733,6 +759,7 @@ int main(int argc, char *argv[]) {
                                     velocityX *= -1;
                                     velocityY *= -1;
                                     playerScore += scoreMultiplier;
+                                    newBallScoreCounter += scoreMultiplier;
                                     scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 999;
                                     yDidBounceAlready = 1;
@@ -756,6 +783,7 @@ int main(int argc, char *argv[]) {
                                     bricks[(ballY - 1) / 2][((ballX - 1) - brickLength) / brickLength] = 0;
                                     velocityX *= -1;
                                     playerScore += scoreMultiplier;
+                                    newBallScoreCounter += scoreMultiplier;
                                     scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 999;
                                 }
@@ -763,6 +791,7 @@ int main(int argc, char *argv[]) {
                                     bricks[(ballY - 2) / 2][((ballX - 1) - brickLength) / brickLength] = 0;
                                     velocityX *= -1;
                                     playerScore += scoreMultiplier;
+                                    newBallScoreCounter += scoreMultiplier;
                                     scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 999;
                                 }
@@ -784,6 +813,7 @@ int main(int argc, char *argv[]) {
                                     bricks[(ballY - 1) / 2][((ballX + 1) - 1) / brickLength] = 0;
                                     velocityX *= -1;
                                     playerScore += scoreMultiplier;
+                                    newBallScoreCounter += scoreMultiplier;
                                     scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 999;
                                 }
@@ -791,6 +821,7 @@ int main(int argc, char *argv[]) {
                                     bricks[(ballY - 2) / 2][((ballX + 1) - 1) / brickLength] = 0;
                                     velocityX *= -1;
                                     playerScore += scoreMultiplier;
+                                    newBallScoreCounter += scoreMultiplier;
                                     scoreMultiplier = increaseMult(scoreMultiplier, 1);
                                     collisionCase = 999;
                                 }
@@ -891,13 +922,14 @@ int main(int argc, char *argv[]) {
                     else {
                         for (i = 0; i < brickRows; i++) {
                             for (j = 0; j < brickColumns; j++) {
-                                bricks[i][j] = 1;
+                                bricks[i][j] = (int)difftime(clock(),xTimer) % 2;
                             }
                         }
                         didReset = 1;
                     }
                     mvwaddch(gamescr, ballY, ballX , ' ');
                     playerScore += 10 * scoreMultiplier;
+                    newBallScoreCounter += 10 * scoreMultiplier;
                     ballX = width / 2;
                     ballY = height - 3;
                     velocityY = -1;
@@ -925,13 +957,17 @@ int main(int argc, char *argv[]) {
         
         // Update the score, ball count, and multiplier
         if (collisionUpdate) {
+            if (newBallScoreCounter >= SCORE_TO_NEW_BALL) {
+                newBallScoreCounter = 0;
+                ballsRemaining++;
+            }
             mvwprintw(scoreWin, 0, 0, "LIVES");
             mvwprintw(scoreWin, 0, 6, " ");
             for (i = 0; i < ballsRemaining; i++) {
                 mvwprintw(scoreWin, 0, (i * 2) + 6, "o  ");
             }
             mvwprintw(scoreWin, 0, width-14, "%2dX MULTIPLIER", scoreMultiplier);
-            mvwprintw(scoreWin, 1, 0, "SCORE %d", playerScore);
+            mvwprintw(scoreWin, 1, 0, "SCORE %d\n", playerScore);
             mvwprintw(scoreWin, 1, width/2 - (strlen(title)/2), "%s", title);
         }
         
