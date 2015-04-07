@@ -1,4 +1,4 @@
-# cursed-breakout v1.0
+# cursed-breakout v1.0.1
 The beloved brick breaking game now running in your favorite terminal emulator! While browsing GitHub, I was unable to find any Breakout clones that were made in pure C (or at least using common C libraries), so I decided to rectify this. Cursed-breakout is built using the ncurses library, hence the name, and should run on most Posix systems. I'll do my best to check whether or not it runs on particular systems, but it would really help if you could test it on your system, and send me a bug report if it doesn't.
 
 It`s just a fun little project, and anyone who wants may use it for commercial or non-commercial projects, as long as the usage adheres to the MIT license. Have fun!
@@ -19,6 +19,9 @@ Type `make` to build the program, and `./breakout` (or `./breakout example.lvl`)
 For debugging, type `make debug` when compiling. You may need to type `make clean` before doing so if you have already built it normally. Make sure that you choose an ample size for your terminal emulator if you use the debug info. It may overlap the game if you do not. 
 
 # Changelog
+#### v1.0.1
+- Fixed an issue relating to using difftime that caused Infinite Mode to draw no bricks and freeze on Linux systems.
+
 #### v1.0 GM
 - Official release, yay!
 - Added new ball reward every 2000 points

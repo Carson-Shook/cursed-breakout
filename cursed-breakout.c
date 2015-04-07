@@ -324,9 +324,10 @@ int main(int argc, char *argv[]) {
         }
     }
     else {
+        srand(clock());
         for (i = 0; i < brickRows; i++) {
             for (j = 0; j < brickColumns; j++) {
-                bricks[i][j] = (int)difftime(clock(),xTimer) % 2;
+                bricks[i][j] = rand() % 2;
             }
         }
         strcpy(title, "Infinite Mode");
@@ -922,7 +923,7 @@ int main(int argc, char *argv[]) {
                     else {
                         for (i = 0; i < brickRows; i++) {
                             for (j = 0; j < brickColumns; j++) {
-                                bricks[i][j] = (int)difftime(clock(),xTimer) % 2;
+                                bricks[i][j] = rand() % 2;
                             }
                         }
                         didReset = 1;
