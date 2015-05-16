@@ -1,0 +1,243 @@
+@import url(http://fonts.googleapis.com/css?family=Raleway:200,300,600);
+/*@import url(http://fonts.googleapis.com/css?family=Roboto:300,400,400italic,700italic,700,300italic);*/
+
+html {
+    background-color: whitesmoke;
+}
+body {
+    text-align: center;
+    font-family: "Helvetica Neue","Arial","Liberationsans","Freesans",sans-serif;
+	font-size: 1em;
+    font-weight: 400;
+    padding: 0;
+    border: 0;
+    margin: 0;
+}
+nav {
+    position: fixed;
+	background-color: #e3e3e6;
+	display: block;
+	width: 100%;
+	height: 50px;
+	box-sizing: border-box;
+	-moz-box-sizing:border-box;
+	-webkit-box-sizing:border-box;
+	top: 0px;
+	text-align: left;
+    z-index: 99;
+    -webkit-font-smoothing: subpixel-antialiased;
+}
+header {
+	display: inline-block;
+	font-family: "Raleway", sans-serif;
+	font-weight: 900;
+	font-size: 1.2em;
+	vertical-align: 35%;
+	width: 100%;
+	/*background-color: slategray;*/
+}
+main {
+    background-color: whitesmoke;
+    padding: 0px;
+    padding-top: 5em;
+    display: inline-block;
+    width: 100%;
+}
+article {
+	padding: 0px;
+}
+footer {
+	font-weight: 500;
+	font-size: 1.0em;
+    color: #99999c;
+	margin-top: 10px;
+    margin-bottom: 10px;
+}
+a {
+    color: #6666aa;
+    text-decoration: none;
+}
+a:hover {
+    text-decoration: underline;
+}
+hr {
+    height: 1px;
+    padding: 0px;
+    border: none;
+    color: slategray;
+    margin: 0;
+}
+h1 {
+	font-family: "Raleway", sans-serif;
+	font-weight: 300;
+	font-size: 3em;
+    margin-top: 0px;
+    margin-bottom: 0em;
+}
+h2 {
+	font-family: "Raleway", sans-serif;
+	font-weight: 300;
+	font-size: 1.6em;
+	color: darkslategray;
+	margin-top: 0px;
+	margin-bottom: 1.4em;
+}
+h3 {
+	font-family: "Raleway", sans-serif;
+	font-weight: 600;
+	font-size: 1.4em;
+    margin: 0;
+    margin-top: 0.8em;
+	color: #313132;
+}
+p {
+	font-weight: 400;
+	font-size: 1.2em;
+	line-height: 150%;
+	margin-top: 0px;
+    margin-bottom: 1em;
+    color:#333;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+ul {
+    font-weight: 400;
+    font-size: 1.2em;
+    line-height: 150%;
+    color:#333;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+li {
+    margin-bottom: 15px;
+}
+table {
+    font-size: 1.2em;
+    font-weight: 300;
+    display: inline-block;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    border-spacing: 0px;
+}
+th {
+    padding: 5px 10px 5px 10px;
+    font-weight: 600;
+    color: white;
+    background-color: #99999c;
+}
+td {
+    padding: 5px;
+    font-weight:400;
+    color: #333;
+    background-color: #e3e3e6;
+}
+code {
+    padding: 0 .5em 0 .5em;
+    border: 1px solid #c3c3c6;
+    background-color: #e3e3e6;
+	border-radius: 4px;
+	color: darkslategray;
+    display: inline-block;
+    line-height: 140%;
+    font-weight: 600;
+}
+pre {
+    width: auto;
+    max-width: 90%;
+    overflow: auto;
+    background-color: #e3e3e6;
+    border-radius: 4px;
+    margin: 2em 2em;
+    padding: 1em 1.5em;
+    border: 1px solid #c3c3c6;
+}
+pre>code {
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0px;
+    font-size: 1.1em;
+    color: darkslategray;
+    background-color: transparent;
+}
+.navigation {
+	transition: .2s ease-in-out;
+	display: inline-block;
+	vertical-align: top;
+	box-sizing: border-box;
+	-moz-box-sizing:border-box;
+	-webkit-box-sizing:border-box;
+	font-weight: 700;
+	font-size: 1.2em;
+	color: darkslategray;
+	text-decoration: none;
+	border-top: 4px solid transparent;
+	padding: 8px 10px 0px 10px;
+	height: 100%;
+}
+.navigation:hover {
+	transition: .2s ease-in-out;
+	background-color: #bbbbc5;
+	color: #313132;
+	text-decoration: none;
+}
+.dropDownContainer>.dropDownMenu {
+    transition: .2s ease-in-out;
+    display: none;
+}
+.dropDownContainer:hover>.dropDownMenu, .dropDownContainer:focus>.dropDownMenu {
+    transition: .2s ease-in-out;
+    display: inline-block;
+    position: absolute;
+    background-color: #bbbbc5;
+    margin-left: -96px;
+    margin-top: 50px;
+    
+}
+.dropDownContainer:hover>.navigation {
+    background-color: #bbbbc5;
+}
+div.dropDownItem>a {
+    padding-top: 12px;
+    padding-bottom: 12px;
+    padding-left: 12px;
+    padding-right: 12px;
+    width: 100%;
+    display: inline-block;
+    font-weight: 700;
+    font-size: 1em;
+    color: darkslategray;
+    text-decoration: none;
+    box-sizing: border-box;
+}
+div.dropDownItem>a:hover {
+    background-color: #aaaab5;
+    color: #313132;
+}
+body#blog .navigation#blog {
+	border-top: 4px solid slategray;
+}
+body#projects .navigation#projects {
+    border-top: 4px solid slategray;
+}
+body#about .navigation#about {
+    border-top: 4px solid slategray;
+}
+#title {
+	transition: .2s ease-in-out;
+	display: inline-block;
+	vertical-align: middle;
+    font-family: "Raleway", sans-serif;
+	font-weight: 200;
+    font-size: 2.5em;
+	text-decoration: none;
+	color: darkslategray;
+	padding: 0px 10px 0px 10px;
+	height: 100%;
+    box-sizing: border-box;
+}
+#title:hover {
+	transition: .2s ease-in-out;
+	background-color: #bbbbc5;
+	color: #313132;
+}
